@@ -1,58 +1,145 @@
-# 🔊 Speech Emotion Recognition via Knowledge Distillation
+# 🎧 Speech Emotion Recognition with Knowledge Distillation
 
-This repository demonstrates an efficient and scalable approach to **Speech Emotion Recognition (SER)** using **Knowledge Distillation (KD)**. A large pre-trained **Wav2Vec2** model serves as the teacher, while a lightweight **LiteCNN** model is trained to replicate its performance with significantly fewer parameters and faster inference times.
+This repository implements **Speech Emotion Recognition (SER)** using a compact student CNN model trained via **Knowledge Distillation** from a larger pre-trained **Wav2Vec2.0 teacher model**. The goal is to compress a large model into a lightweight one while maintaining performance — ideal for deployment in resource-constrained environments like mobile devices.
 
----
+## 🔗 Live Demo
 
-## 🎯 Live Demo
-
-Test the model directly in your browser using our interactive Streamlit app:
-
-🔗 **[🎙️ Speech Emotion Recognition App](https://speechemotiondistill-sjfvberakplyvwznf62bri.streamlit.app/)**
-
-Upload a `.wav` file (16kHz mono) and receive instant emotion predictions.
+👉 [Try the model on Streamlit!](https://speechemotiondistill-sjfvberakplyvwznf62bri.streamlit.app/)
 
 ---
 
-## 📌 Table of Contents
+## 🧠 Key Concepts
 
-- [🔍 Overview](#-overview)
-- [📊 Model Architecture](#-model-architecture)
-- [🧠 Knowledge Distillation](#-knowledge-distillation)
-- [📁 Dataset](#-dataset)
-- [⚙️ Setup](#-setup)
-- [🏋️ Training Details](#-training-details)
-- [📈 Metrics](#-metrics)
-- [🧪 Results](#-results)
-- [📦 Outputs](#-outputs)
-- [🚀 Future Work](#-future-work)
-- [🙌 Acknowledgements](#-acknowledgements)
+- **Teacher Model**: `Wav2Vec2ForSequenceClassification` (from HuggingFace Transformers)
+- **Student Model**: Custom lightweight `LiteCNN` architecture using depthwise separable convolutions and bottleneck layers.
+- **Knowledge Distillation**:
+  - Trains the student using both **hard labels** (ground truth) and **soft labels** (teacher's output probabilities).
+  - Helps the student learn better generalization with fewer parameters.
 
 ---
 
-## 🔍 Overview
+## 📁 Dataset: CREMA-D
 
-Speech Emotion Recognition is crucial for improving human-computer interaction. While large models like **Wav2Vec2** achieve high accuracy, they are computationally expensive.
+- **CREMA-D**: Crowd-sourced Emotional Multimodal Actors Dataset
+- **Classes**: `ANG`, `DIS`, `FEA`, `HAP`, `SAD`, `NEU`
+- Audio files are preprocessed to 16 kHz and trimmed/padded to 1 second.
 
-This project uses **Knowledge Distillation** to train a **compact CNN model** that:
-- Matches the accuracy of large models within a margin
-- Is much faster and lighter for real-time inference
-- Works directly on raw audio without handcrafted features
+> 💡 Ensure you download the dataset and set `AUDIO_DIR` in your script accordingly.
 
 ---
 
-## 📊 Model Architecture
+## 🏗️ Model Architecture
 
-### 🧠 Teacher: `Wav2Vec2ForSequenceClassification`
+### 🧑‍🏫 Teacher: Wav2Vec2
 
-- Pre-trained transformer-based model from `facebook/wav2vec2-base`
-- Fine-tuned on emotion labels (ANG, DIS, FEA, HAP, SAD, NEU)
-- ~95M parameters
-- Serves as the reference model during distillation
+- HuggingFace's `facebook/wav2vec2-base`
+- Fine-tuned on emotion classification (6 labels)
 
-### 🎓 Student: `LiteCNN`
-
-A custom 1D CNN built for efficiency:
+### 🧑‍🎓 Student: LiteCNN
 
 ```python
-Input: Raw waveform (1D) → Conv1D → Depthwise Separable Conv → Bottleneck → Adaptive Pooling → Fully Connected → Output
+Input: [B, 1, 16000]
+→ Conv1D + ReLU + MaxPool
+→ Depthwise + Pointwise Conv
+→ Bottleneck Conv
+→ AdaptiveAvgPool
+→ Flatten → Fully Connected → Output (6 classes)
+```
+
+- Lightweight
+- Depthwise separable convolutions reduce complexity
+- 25x–30x fewer parameters than the teacher
+
+---
+
+## 🧪 Training Strategy
+
+- **Optimizer**: Adam
+- **Scheduler**: ReduceLROnPlateau (adaptive learning rate)
+- **Loss Function**: Custom Distillation Loss combining:
+  - `CrossEntropyLoss` (hard labels)
+  - `KL Divergence` (soft labels)
+- **Alpha**: Weighting between task and distillation loss
+- **Temperature**: Softens logits for distillation
+
+---
+
+## 📊 Performance Metrics
+
+During training and validation:
+- **Accuracy**
+- **Precision (macro)**
+- **Recall (macro)**
+- **Loss Components**: Total, Task, Distillation
+
+---
+
+## 🚀 How to Run
+
+### 🔧 1. Install Dependencies
+
+```bash
+pip install torch torchaudio scikit-learn tqdm transformers
+```
+
+### 📦 2. Prepare Dataset
+
+- Download the **CREMA-D** dataset.
+- Set `AUDIO_DIR` to your local path.
+
+### 🏋️ 3. Train the Student Model
+
+```bash
+python train_student_kd.py
+```
+
+This script:
+- Loads teacher model weights
+- Trains student with knowledge distillation
+- Logs metrics
+- Saves `crema_student_model_kd.pth`
+
+---
+
+## 💻 Deployment
+
+The trained student model is deployed via **Streamlit** for real-time inference.
+
+🔗 **[Launch Streamlit App](https://speechemotiondistill-sjfvberakplyvwznf62bri.streamlit.app/)**  
+Upload an audio clip and see the model predict the emotion in seconds.
+
+---
+
+## 📈 Model Compression Summary
+
+| Model         | Parameters | Size     | Accuracy (Val) | Notes                        |
+|---------------|------------|----------|----------------|------------------------------|
+| Teacher (Wav2Vec2) | ~95M       | Large    | High           | Pre-trained transformer model |
+| Student (LiteCNN)  | ~3.5M      | Small    | Slight drop    | Optimized for speed & memory  |
+
+🧊 **Compression Ratio**: ~27x smaller!
+
+---
+
+## 🧪 Example Outputs
+
+| Audio Input       | Predicted Emotion |
+|-------------------|-------------------|
+| happy_01.wav      | `HAP`             |
+| sad_03.wav        | `SAD`             |
+| angry_07.wav      | `ANG`             |
+
+---
+
+## 🙌 Acknowledgements
+
+- [CREMA-D Dataset](https://github.com/CheyneyComputerScience/CREMA-D)
+- [HuggingFace Transformers](https://huggingface.co/transformers/)
+- [Streamlit](https://streamlit.io/)
+
+---
+
+## 📬 Contact
+
+For questions or improvements, feel free to reach out or open an issue.  
+Happy experimenting! 🎉
