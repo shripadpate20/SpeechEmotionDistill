@@ -40,7 +40,7 @@ class LiteCNN(nn.Module):
 
 # Instantiate and load model
 model = LiteCNN()
-state_dict = torch.load("/content/crema_student_model_kd.pth", map_location=torch.device('cpu'), weights_only=True)
+state_dict = torch.load("crema_student_model_kd.pth", map_location=torch.device('cpu'), weights_only=True)
 
 model.load_state_dict(state_dict)
 model.eval()
